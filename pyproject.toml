@@ -1,0 +1,64 @@
+[project]
+name = "poke-merkdo"
+version = "1.0.0"
+description = "Professional Pokémon card catalog generator for Poke MerKdo"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Wembie"}
+]
+maintainers = [
+    {name = "Wembie"}
+]
+keywords = ["pokemon", "tcg", "catalog", "pdf", "cards"]
+dependencies = [
+    "pandas>=2.2.0",
+    "pydantic>=2.10.0",
+    "typer>=0.15.0",
+    "rich>=13.9.0",
+    "reportlab>=4.2.0",
+    "Pillow>=11.0.0",
+    "requests>=2.32.0",
+    "diskcache>=5.6.0",
+    "tcgdex-sdk>=2.2.1",
+]
+
+[project.scripts]
+poke-merkdo = "poke_merkdo.cli:app"
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.0.0",
+    "mypy>=1.8.0",
+    "flake8>=7.0.0",
+    "ruff>=0.5.0",
+    "pandas-stubs>=2.2.0",
+    "types-requests>=2.32.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["poke_merkdo"]
+
+[tool.setuptools.package-data]
+poke_merkdo = ["py.typed"]
+
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
