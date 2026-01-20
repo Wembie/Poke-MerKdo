@@ -61,13 +61,24 @@ def generate(
         "-t",
         help="Catalog title",
     ),
+    all_cards: bool = typer.Option(
+        False,
+        "--all/--saleable",
+        "-a",
+        help="Include ALL cards (default: only saleable with qty >= 2)",
+    ),
+    min_quantity: int = typer.Option(
+        2,
+        "--min-qty",
+        "-m",
+        help="Minimum quantity to include (default: 2, use 1 for all)",
+    ),
 ) -> None:
     """
-    Generate PDF catalog of saleable cards (quantity >= 2).
+    Generate PDF catalog of cards.
 
-    This will parse your collection CSV, optionally enrich cards with
-    Pokemon TCG API data (images + stats), and generate a professional
-    PDF catalog showing only cards available for sale.
+    By default, only includes saleable cards (quantity >= 2).
+    Use --all to include ALL cards, or --min-qty to set custom minimum.
     """
     console.print(Panel.fit("Poke MerKdo - Catalog Generator", style="bold magenta"))
 
@@ -87,14 +98,23 @@ def generate(
 
     _load_custom_prices(collection)
 
-    saleable = collection.get_saleable_cards()
-    console.print(
-        f"[yellow]>[/yellow]  Found [bold]{len(saleable)}[/bold] saleable cards "
-        f"({collection.total_saleable_cards()} total copies)"
-    )
+    if all_cards:
+        min_quantity = 1
+
+    saleable = collection.get_cards_by_min_quantity(min_quantity)
+
+    if min_quantity == 1:
+        console.print(
+            f"[yellow]>[/yellow]  Including [bold]{len(saleable)}[/bold] cards (ALL)"
+        )
+    else:
+        console.print(
+            f"[yellow]>[/yellow]  Found [bold]{len(saleable)}[/bold] saleable cards "
+            f"(qty >= {min_quantity})"
+        )
 
     if not saleable:
-        console.print("[red]No cards with quantity >= 2 found. Nothing to sell![/red]")
+        console.print(f"[red]No cards with quantity >= {min_quantity} found.[/red]")
         raise typer.Exit(0)
 
     if enrich:
@@ -130,6 +150,7 @@ def generate(
             title=title,
             include_stats=include_stats,
             show_prices=show_prices,
+            saleable_cards=saleable,
         )
 
         console.print(

@@ -27,14 +27,21 @@ class Collection(BaseModel):
 
     def get_saleable_cards(self) -> list[SaleableCard]:
         """Get all cards with quantity >= 2 (keep 1, sell the rest)"""
-        saleable = []
+        return self.get_cards_by_min_quantity(min_quantity=2)
+
+    def get_cards_by_min_quantity(self, min_quantity: int = 2) -> list[SaleableCard]:
+        """Get cards with quantity >= min_quantity"""
+        result = []
         for card in self.cards:
-            if card.quantity >= 2:
-                quantity_for_sale = card.quantity - 1
-                saleable.append(
+            if card.quantity >= min_quantity:
+                if min_quantity == 1:
+                    quantity_for_sale = card.quantity
+                else:
+                    quantity_for_sale = card.quantity - 1
+                result.append(
                     SaleableCard(card=card, quantity_for_sale=quantity_for_sale)
                 )
-        return saleable
+        return result
 
     def get_cards_by_set(self, set_name: str) -> list[Card]:
         """Filter cards by set name"""

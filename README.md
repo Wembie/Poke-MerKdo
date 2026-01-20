@@ -6,7 +6,7 @@ Parsea tu colección exportada desde PriceCharting, enriquece las cartas con im�
 
 ## Características
 
-- **Parseo de CSV** - Importa tu colección desde TCGPlayer
+- **Parseo de CSV** - Importa tu colección desde PriceCharting
 - **Enriquecimiento automático** - Descarga imágenes HD de TCGdex
 - **PDF profesional** - Grid de 3x3 cartas por página con imágenes
 - **Caché de imágenes** - No vuelve a descargar imágenes ya obtenidas
@@ -77,12 +77,20 @@ poke-merkdo generate --enrich -o mi_catalogo.pdf
 | `--output, -o` | Ruta del PDF de salida | `catalogs/catalog_FECHA.pdf` |
 | `--title, -t` | Título del catálogo | "Poke MerKdo - Catálogo de Cartas" |
 | `--stats/--no-stats` | Incluir estadísticas | Sí |
+| `--all, -a` | Incluir TODAS las cartas | No (solo qty >= 2) |
+| `--min-qty, -m` | Cantidad mínima para incluir | 2 |
 
 ### Ejemplos
 
 ```bash
-# Catálogo básico con imágenes
+# Catálogo básico con imágenes (solo cartas con qty >= 2)
 uv run poke-merkdo generate --enrich
+
+# Catálogo con TODAS las cartas
+uv run poke-merkdo generate --enrich --all
+
+# Catálogo con cartas qty >= 3
+uv run poke-merkdo generate --enrich --min-qty 3
 
 # Catálogo con título personalizado
 uv run poke-merkdo generate --enrich --title "Mi Tienda Pokemon"
