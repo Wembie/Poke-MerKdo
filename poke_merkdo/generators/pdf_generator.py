@@ -74,12 +74,14 @@ class PDFGenerator:
         title: str = "Poke MerKdo - Catálogo de Cartas",
         include_stats: bool = True,
         show_prices: bool = False,
+        saleable_cards: list[SaleableCard] | None = None,
     ) -> Path:
         """Generate PDF catalog from collection"""
-        saleable_cards = collection.get_saleable_cards()
+        if saleable_cards is None:
+            saleable_cards = collection.get_saleable_cards()
 
         if not saleable_cards:
-            console.print("[yellow]⚠️  No saleable cards found (quantity >= 2)[/yellow]")
+            console.print("[yellow]Warning: No cards to include in catalog[/yellow]")
             return output_path
 
         console.print(
@@ -234,7 +236,7 @@ class PDFGenerator:
             fontName="Helvetica-Bold",
         )
         ig_text = (
-            f'📸 Síguenos en Instagram: '
+            f"📸 Síguenos en Instagram: "
             f'<a href="{INSTAGRAM_URL}">{INSTAGRAM_HANDLE}</a>'
         )
         elements.append(Paragraph(ig_text, ig_style))
