@@ -33,6 +33,7 @@ class PDFGenerator:
         self.cache = cache or ImageCache()
         self.styles = getSampleStyleSheet()
         self._setup_custom_styles()
+        self._warnings: list[str] = []  # Collect warnings to show later
 
     def _setup_custom_styles(self) -> None:
         """Setup custom paragraph styles"""
@@ -75,18 +76,20 @@ class PDFGenerator:
         include_stats: bool = True,
         show_prices: bool = False,
         saleable_cards: list[SaleableCard] | None = None,
-    ) -> Path:
-        """Generate PDF catalog from collection"""
+        show_progress: bool = True,
+    ) -> tuple[Path, list[str]]:
+        """Generate PDF catalog from collection
+
+        Returns:
+            Tuple of (output_path, list of warnings)
+        """
+        self._warnings = []  # Reset warnings
+
         if saleable_cards is None:
             saleable_cards = collection.get_saleable_cards()
 
         if not saleable_cards:
-            console.print("[yellow]Warning: No cards to include in catalog[/yellow]")
-            return output_path
-
-        console.print(
-            f"[cyan]Generating catalog for {len(saleable_cards)} cards...[/cyan]"
-        )
+            return output_path, self._warnings
 
         doc = SimpleDocTemplate(
             str(output_path),
@@ -109,10 +112,9 @@ class PDFGenerator:
 
         if has_images:
             cards_per_page = 9
-            for i in track(
-                range(0, len(saleable_cards), cards_per_page),
-                description="Creating pages...",
-            ):
+            page_range = range(0, len(saleable_cards), cards_per_page)
+            iterator = track(page_range, description="Creating pages...") if show_progress else page_range
+            for i in iterator:
                 page_cards = saleable_cards[i : i + cards_per_page]
                 page_content = self._create_card_page(
                     page_cards, include_stats, show_prices
@@ -126,9 +128,7 @@ class PDFGenerator:
             story.extend(page_content)
 
         doc.build(story)
-        console.print(f"[green]OK[/green] PDF generated: {output_path}")
-
-        return output_path
+        return output_path, self._warnings
 
     def _create_title_page(self, title: str, collection: Collection) -> list:
         """Create title page with summary"""
@@ -140,7 +140,7 @@ class PDFGenerator:
                 elements.append(logo)
                 elements.append(Spacer(1, 0.2 * inch))
             except Exception as e:
-                console.print(f"[yellow]Warning: Could not load logo: {e}[/yellow]")
+                self._warnings.append(f"Could not load logo: {e}")
 
         title_style = ParagraphStyle(
             name="Title",
@@ -310,9 +310,7 @@ class PDFGenerator:
                     img = RLImage(str(image_path), width=1.5 * inch, height=2.1 * inch)
                     cell_rows.append([img])
                 except Exception as e:
-                    console.print(
-                        f"[red]Error loading image for {card.product_name}: {e}[/red]"
-                    )
+                    self._warnings.append(f"Error loading image for {card.product_name}: {e}")
 
         name_text = f"<b>{card.card_name}</b>"
         if card.card_number:

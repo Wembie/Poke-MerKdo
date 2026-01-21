@@ -12,7 +12,7 @@ Uso:
 
 import re
 import unicodedata
-from asyncio import run as asyncio_run
+from asyncio import Semaphore, gather, run as asyncio_run
 from logging import getLogger
 
 from requests import get as requests_get
@@ -349,39 +349,57 @@ class TCGdexEnricher:
             card.image_url = f"{tcg_card.image}/high.png"
 
     async def enrich_cards(
-        self, cards: list[Card], show_progress: bool = False
-    ) -> tuple[int, int]:
+        self,
+        cards: list[Card],
+        show_progress: bool = False,
+        max_concurrent: int = 20,
+    ) -> tuple[int, int, list[Card]]:
         """
-        Enriquece múltiples cartas.
+        Enriquece múltiples cartas en paralelo.
 
         Args:
             cards: Lista de cartas
             show_progress: Mostrar progreso
+            max_concurrent: Máximo de requests concurrentes (default: 20)
 
         Returns:
-            Tupla (encontradas, no encontradas)
+            Tupla (encontradas, no encontradas, lista_no_encontradas)
         """
+        semaphore = Semaphore(max_concurrent)
+        not_found_cards: list[Card] = []
+
+        async def enrich_with_semaphore(card: Card) -> bool:
+            async with semaphore:
+                return await self.enrich_card(card)
+
+        if show_progress:
+            logger.info(
+                f"Processing {len(cards)} cards (max {max_concurrent} concurrent)..."
+            )
+
+        tasks = [enrich_with_semaphore(card) for card in cards]
+        results = await gather(*tasks)
+
         found = 0
         not_found = 0
-        total = len(cards)
 
-        for i, card in enumerate(cards):
-            if show_progress and i % 10 == 0:
-                logger.info(f"Progress: {i}/{total}")
-
-            success = await self.enrich_card(card)
+        for card, success in zip(cards, results):
             if success:
                 found += 1
             else:
                 not_found += 1
+                not_found_cards.append(card)
 
         logger.info(f"Enrichment complete: {found} found, {not_found} not found")
-        return found, not_found
+        return found, not_found, not_found_cards
 
 
 async def enrich_cards_with_tcgdex(
-    cards: list[Card], language: str = "en", show_progress: bool = False
-) -> tuple[int, int]:
+    cards: list[Card],
+    language: str = "en",
+    show_progress: bool = False,
+    max_concurrent: int = 20,
+) -> tuple[int, int, list[Card]]:
     """
     Función async para enriquecer cartas con TCGdex.
 
@@ -389,17 +407,23 @@ async def enrich_cards_with_tcgdex(
         cards: Lista de cartas a enriquecer
         language: Idioma (default: "en")
         show_progress: Mostrar progreso
+        max_concurrent: Máximo de requests concurrentes
 
     Returns:
-        Tupla (encontradas, no encontradas)
+        Tupla (encontradas, no encontradas, lista_no_encontradas)
     """
     enricher = TCGdexEnricher(language=language)
-    return await enricher.enrich_cards(cards, show_progress=show_progress)
+    return await enricher.enrich_cards(
+        cards, show_progress=show_progress, max_concurrent=max_concurrent
+    )
 
 
 def enrich_cards_sync(
-    cards: list[Card], language: str = "en", show_progress: bool = False
-) -> tuple[int, int]:
+    cards: list[Card],
+    language: str = "en",
+    show_progress: bool = False,
+    max_concurrent: int = 20,
+) -> tuple[int, int, list[Card]]:
     """
     Versión síncrona del enricher.
 
@@ -407,8 +431,11 @@ def enrich_cards_sync(
         cards: Lista de cartas
         language: Idioma
         show_progress: Mostrar progreso
+        max_concurrent: Máximo de requests concurrentes
 
     Returns:
-        Tupla (encontradas, no encontradas)
+        Tupla (encontradas, no encontradas, lista_no_encontradas)
     """
-    return asyncio_run(enrich_cards_with_tcgdex(cards, language, show_progress))
+    return asyncio_run(
+        enrich_cards_with_tcgdex(cards, language, show_progress, max_concurrent)
+    )
