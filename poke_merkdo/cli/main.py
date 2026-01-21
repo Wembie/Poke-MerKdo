@@ -14,9 +14,18 @@ from rich.table import Table
 
 from poke_merkdo.api.tcgdex_enricher import enrich_cards_sync
 from poke_merkdo.cache import ImageCache
-from poke_merkdo.config import CATALOG_DIR, COLLECTION_CSV, LOGS_DIR, PRICES_JSON
+from poke_merkdo.config import (
+    CATALOG_DIR,
+    CATALOG_TITLE,
+    COLLECTION_CSV,
+    CONFIG_JSON,
+    LOGS_DIR,
+    PRICES_JSON,
+    get_config,
+    update_config,
+)
 from poke_merkdo.generators import PDFGenerator
-from poke_merkdo.models import Collection
+from poke_merkdo.models import Card, Collection
 from poke_merkdo.parsers import CSVParser
 
 app = typer.Typer(
@@ -63,7 +72,7 @@ def generate(  # noqa: PLR0913
         show_default=True,
     ),
     title: str = typer.Option(
-        "Poke MerKdo - Catálogo de Cartas",
+        CATALOG_TITLE,
         "--title",
         "-t",
         help="Catalog title",
@@ -95,10 +104,15 @@ def generate(  # noqa: PLR0913
         console.print(f"[red]X[/red] CSV file not found: {csv_file}")
         raise typer.Exit(1)
 
-    # Define steps for progress bar
     steps = ["Loading CSV", "Processing cards", "Generating PDF", "Finalizing"]
     if enrich:
-        steps = ["Loading CSV", "Processing cards", "Enriching with TCGdex", "Generating PDF", "Finalizing"]
+        steps = [
+            "Loading CSV",
+            "Processing cards",
+            "Enriching with TCGdex",
+            "Generating PDF",
+            "Finalizing",
+        ]
 
     total_steps = len(steps)
 
@@ -113,7 +127,6 @@ def generate(  # noqa: PLR0913
         main_task = progress.add_task("Overall progress", total=total_steps)
         current_step = 0
 
-        # Step 1: Load CSV
         progress.update(main_task, description=f"[cyan]{steps[current_step]}...")
         parser = CSVParser(csv_file)
         collection = parser.parse()
@@ -121,7 +134,6 @@ def generate(  # noqa: PLR0913
         current_step += 1
         progress.update(main_task, completed=current_step)
 
-        # Step 2: Process cards
         progress.update(main_task, description=f"[cyan]{steps[current_step]}...")
         if all_cards:
             min_quantity = 1
@@ -134,18 +146,19 @@ def generate(  # noqa: PLR0913
         current_step += 1
         progress.update(main_task, completed=current_step)
 
-        # Step 3: Enrich (if enabled)
-        not_found_cards = []
+        not_found_cards: list[Card] = []
         if enrich:
             progress.update(main_task, description=f"[cyan]{steps[current_step]}...")
             cards_to_enrich = [sc.card for sc in saleable]
             found, not_found, not_found_cards = enrich_cards_sync(
-                cards=cards_to_enrich, language="en", show_progress=False, max_concurrent=20
+                cards=cards_to_enrich,
+                language="en",
+                show_progress=False,
+                max_concurrent=20,
             )
             current_step += 1
             progress.update(main_task, completed=current_step)
 
-        # Step 4: Generate PDF
         progress.update(main_task, description=f"[cyan]{steps[current_step]}...")
         if not output:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -168,43 +181,58 @@ def generate(  # noqa: PLR0913
             current_step += 1
             progress.update(main_task, completed=current_step)
 
-            # Step 5: Finalize
             progress.update(main_task, description=f"[cyan]{steps[current_step]}...")
             current_step += 1
-            progress.update(main_task, completed=current_step, description="[green]Complete!")
+            progress.update(
+                main_task, completed=current_step, description="[green]Complete!"
+            )
 
         except Exception as e:
             progress.stop()
             console.print(f"[red]X Error generating PDF:[/red] {e}")
             raise typer.Exit(1)
 
-    # Show PDF warnings after progress bar
     for warning in pdf_warnings:
         console.print(f"[yellow]Warning:[/yellow] {warning}")
 
-    # Print summary after progress bar
-    console.print(f"\n[green]OK[/green] Loaded {collection.total_unique_cards()} unique cards ({collection.total_cards()} total)")
+    console.print(
+        f"\n[green]OK[/green] Loaded {collection.total_unique_cards()} unique cards ({collection.total_cards()} total)"
+    )
 
     if min_quantity == 1:
-        console.print(f"[green]OK[/green] Included [bold]{len(saleable)}[/bold] cards (ALL)")
+        console.print(
+            f"[green]OK[/green] Included [bold]{len(saleable)}[/bold] cards (ALL)"
+        )
     else:
-        console.print(f"[green]OK[/green] Found [bold]{len(saleable)}[/bold] saleable cards (qty >= {min_quantity})")
+        console.print(
+            f"[green]OK[/green] Found [bold]{len(saleable)}[/bold] saleable cards (qty >= {min_quantity})"
+        )
 
     if enrich:
-        console.print(f"[green]OK[/green] Enriched: {found} found, {not_found} not found")
+        console.print(
+            f"[green]OK[/green] Enriched: {found} found, {not_found} not found"
+        )
         if not_found_cards:
-            log_file = LOGS_DIR / f"not_found_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.txt"
+            log_file = (
+                LOGS_DIR / f"not_found_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.txt"
+            )
             with open(log_file, "w", encoding="utf-8") as f:
-                f.write(f"Cards not found - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(
+                    f"Cards not found - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                )
                 f.write(f"Total: {not_found}\n")
                 f.write("-" * 50 + "\n\n")
                 for card in not_found_cards:
-                    f.write(f"{card.card_name} | {card.console_name} | #{card.card_number}\n")
-            console.print(f"[yellow]  Not found (first 10):[/yellow]")
+                    f.write(
+                        f"{card.card_name} | {card.console_name} | #{card.card_number}\n"
+                    )
+            console.print("[yellow]  Not found (first 10):[/yellow]")
             for card in not_found_cards[:10]:
                 console.print(f"    - {card.card_name} ({card.console_name})")
             if len(not_found_cards) > 10:
-                console.print(f"[dim]    ... and {len(not_found_cards) - 10} more (see {log_file.name})[/dim]")
+                console.print(
+                    f"[dim]    ... and {len(not_found_cards) - 10} more (see {log_file.name})[/dim]"
+                )
 
     console.print(f"\n[bold green]Success![/bold green] Catalog: {output_path}")
 
@@ -378,6 +406,103 @@ def clear_cache() -> None:
     console.print(
         f"[green]OK[/green] Cache cleared ({size_before / 1024 / 1024:.2f} MB freed)"
     )
+
+
+@app.command()
+def config(
+    key: str | None = typer.Argument(
+        None,
+        help="Configuration key to view or set",
+    ),
+    value: str | None = typer.Argument(
+        None,
+        help="New value to set (optional)",
+    ),
+) -> None:
+    """View or edit store configuration.
+
+    Without arguments: show all settings.
+    With key: show specific setting.
+    With key and value: update setting.
+
+    Available keys:
+      store_name, catalog_title, logo_path,
+      welcome_message, contact_message
+
+    For social networks, edit data/config.json directly.
+    """
+    current_config = get_config()
+
+    if key is None:
+        console.print(Panel.fit("Store Configuration", style="bold magenta"))
+        console.print(f"[dim]Config file: {CONFIG_JSON}[/dim]\n")
+
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("Key", style="yellow")
+        table.add_column("Value", style="green")
+
+        for k, v in current_config.items():
+            if k == "social_networks":
+                table.add_row(k, f"[{len(v)} networks]")
+            else:
+                display_value = str(v)
+                if len(display_value) > 50:
+                    display_value = display_value[:47] + "..."
+                table.add_row(k, display_value)
+
+        console.print(table)
+
+        networks = current_config.get("social_networks", [])
+        if networks:
+            console.print("\n[bold cyan]Social Networks:[/bold cyan]")
+            for i, net in enumerate(networks, 1):
+                console.print(
+                    f"  {i}. [yellow]{net.get('platform', '')}[/yellow]: {net.get('handle', '')} ({net.get('url', '')})"
+                )
+
+        console.print(
+            "\n[dim]Use 'poke-merkdo config <key> <value>' to update a setting[/dim]"
+        )
+        console.print("[dim]For social networks, edit data/config.json directly[/dim]")
+
+    elif value is None:
+        if key in current_config:
+            val = current_config[key]
+            if key == "social_networks":
+                console.print(f"[cyan]{key}[/cyan]:")
+                for i, net in enumerate(val, 1):
+                    console.print(
+                        f"  {i}. [yellow]{net.get('platform', '')}[/yellow]: {net.get('handle', '')} ({net.get('url', '')})"
+                    )
+            else:
+                console.print(f"[cyan]{key}[/cyan] = [green]{val}[/green]")
+        else:
+            console.print(f"[red]Unknown key:[/red] {key}")
+            console.print(
+                f"[dim]Available keys: {', '.join(current_config.keys())}[/dim]"
+            )
+            raise typer.Exit(1)
+
+    else:
+        if key not in current_config:
+            console.print(f"[red]Unknown key:[/red] {key}")
+            console.print(
+                f"[dim]Available keys: {', '.join(current_config.keys())}[/dim]"
+            )
+            raise typer.Exit(1)
+
+        if key == "social_networks":
+            console.print("[yellow]Cannot update social_networks via CLI.[/yellow]")
+            console.print(
+                f"[dim]Edit {CONFIG_JSON} directly to add/remove social networks.[/dim]"
+            )
+            raise typer.Exit(1)
+
+        old_value = current_config[key]
+        update_config(key, value)
+        console.print(f"[green]OK[/green] Updated [cyan]{key}[/cyan]")
+        console.print(f"  [dim]Old:[/dim] {old_value}")
+        console.print(f"  [green]New:[/green] {value}")
 
 
 def _load_custom_prices(collection: Collection) -> None:
