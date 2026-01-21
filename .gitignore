@@ -34,6 +34,7 @@ ENV/
 
 # Project specific
 data/cache/
+data/logs/
 data/prices.json
 collection.csv
 catalogs/*.pdf
