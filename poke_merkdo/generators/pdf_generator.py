@@ -20,7 +20,13 @@ from rich.console import Console
 from rich.progress import track
 
 from poke_merkdo.cache import ImageCache
-from poke_merkdo.config import AUTHOR, INSTAGRAM_HANDLE, INSTAGRAM_URL, LOGO_PATH
+from poke_merkdo.config import (
+    AUTHOR,
+    CONTACT_MESSAGE,
+    LOGO_PATH,
+    SOCIAL_NETWORKS,
+    WELCOME_MESSAGE,
+)
 from poke_merkdo.models import Collection, SaleableCard
 
 console = Console()
@@ -33,7 +39,7 @@ class PDFGenerator:
         self.cache = cache or ImageCache()
         self.styles = getSampleStyleSheet()
         self._setup_custom_styles()
-        self._warnings: list[str] = []  # Collect warnings to show later
+        self._warnings: list[str] = []
 
     def _setup_custom_styles(self) -> None:
         """Setup custom paragraph styles"""
@@ -83,7 +89,7 @@ class PDFGenerator:
         Returns:
             Tuple of (output_path, list of warnings)
         """
-        self._warnings = []  # Reset warnings
+        self._warnings = []
 
         if saleable_cards is None:
             saleable_cards = collection.get_saleable_cards()
@@ -105,7 +111,7 @@ class PDFGenerator:
 
         story = []
 
-        story.extend(self._create_title_page(title, collection))
+        story.extend(self._create_title_page(title, saleable_cards))
         story.append(PageBreak())
 
         has_images = any(sc.card.image_url for sc in saleable_cards)
@@ -113,7 +119,11 @@ class PDFGenerator:
         if has_images:
             cards_per_page = 9
             page_range = range(0, len(saleable_cards), cards_per_page)
-            iterator = track(page_range, description="Creating pages...") if show_progress else page_range
+            iterator = (
+                track(page_range, description="Creating pages...")
+                if show_progress
+                else page_range
+            )
             for i in iterator:
                 page_cards = saleable_cards[i : i + cards_per_page]
                 page_content = self._create_card_page(
@@ -130,7 +140,9 @@ class PDFGenerator:
         doc.build(story)
         return output_path, self._warnings
 
-    def _create_title_page(self, title: str, collection: Collection) -> list:
+    def _create_title_page(
+        self, title: str, saleable_cards: list[SaleableCard]
+    ) -> list:
         """Create title page with summary"""
         elements = []
 
@@ -165,11 +177,12 @@ class PDFGenerator:
         elements.append(Paragraph("Cartas Pokémon TCG Disponibles", subtitle_style))
         elements.append(Spacer(1, 0.3 * inch))
 
-        saleable = collection.get_saleable_cards()
+        total_unique = len(saleable_cards)
+        total_units = sum(sc.quantity_for_sale for sc in saleable_cards)
 
         summary_data = [
-            ["📦 Cartas únicas disponibles", str(len(saleable))],
-            ["🎴 Total de unidades en stock", str(collection.total_saleable_cards())],
+            ["📦 Cartas únicas disponibles", str(total_unique)],
+            ["🎴 Total de unidades en stock", str(total_units)],
             ["📅 Catálogo actualizado", datetime.now().strftime("%d/%m/%Y")],
         ]
 
@@ -207,9 +220,9 @@ class PDFGenerator:
             leading=16,
         )
         welcome_text = (
-            "Bienvenido a nuestro catálogo de cartas Pokémon TCG.<br/>"
+            f"{WELCOME_MESSAGE}<br/>"
             "Todas las cartas están en excelente condición y listas para entrega.<br/>"
-            "<b>Para consultar precios y disponibilidad, contáctanos directamente.</b>"
+            f"<b>{CONTACT_MESSAGE}</b>"
         )
         elements.append(Paragraph(welcome_text, welcome_style))
         elements.append(Spacer(1, 0.2 * inch))
@@ -222,26 +235,42 @@ class PDFGenerator:
             alignment=1,
             fontName="Helvetica-Bold",
         )
-        contact_text = "📱 Consulta precios por WhatsApp o mensaje directo"
+        contact_text = "📱 Consulta precios por cualquier red social o mensaje directo"
         elements.append(Paragraph(contact_text, contact_style))
 
         elements.append(Spacer(1, 0.3 * inch))
 
-        ig_style = ParagraphStyle(
-            name="Instagram",
+        social_style = ParagraphStyle(
+            name="Social",
             parent=self.styles["Normal"],
-            fontSize=14,
+            fontSize=12,
             textColor=colors.HexColor("#E1306C"),
             alignment=1,
             fontName="Helvetica-Bold",
+            leading=18,
         )
-        ig_text = (
-            f"📸 Síguenos en Instagram: "
-            f'<a href="{INSTAGRAM_URL}">{INSTAGRAM_HANDLE}</a>'
-        )
-        elements.append(Paragraph(ig_text, ig_style))
 
-        elements.append(Spacer(1, 0.5 * inch))
+        platform_icons = {
+            "instagram": "📸",
+            "facebook": "📘",
+            "twitter": "🐦",
+            "x": "𝕏",
+            "tiktok": "🎵",
+            "youtube": "📺",
+            "whatsapp": "📱",
+            "telegram": "✈️",
+        }
+
+        for network in SOCIAL_NETWORKS:
+            platform = network.get("platform", "")
+            handle = network.get("handle", "")
+            url = network.get("url", "")
+
+            icon = platform_icons.get(platform.lower(), "🔗")
+            social_text = f'{icon} {platform}: <a href="{url}">{handle}</a>'
+            elements.append(Paragraph(social_text, social_style))
+
+        elements.append(Spacer(1, 0.4 * inch))
 
         author_style = ParagraphStyle(
             name="Author",
@@ -310,7 +339,9 @@ class PDFGenerator:
                     img = RLImage(str(image_path), width=1.5 * inch, height=2.1 * inch)
                     cell_rows.append([img])
                 except Exception as e:
-                    self._warnings.append(f"Error loading image for {card.product_name}: {e}")
+                    self._warnings.append(
+                        f"Error loading image for {card.product_name}: {e}"
+                    )
 
         name_text = f"<b>{card.card_name}</b>"
         if card.card_number:

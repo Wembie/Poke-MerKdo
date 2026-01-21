@@ -60,6 +60,7 @@ poke-merkdo --help
 | `set-price` | Set custom price for a card |
 | `stats` | Show collection statistics |
 | `clear-cache` | Clear image cache |
+| `config` | View or edit store configuration |
 
 ### Quick Start
 
@@ -164,6 +165,126 @@ poke-merkdo list-cards --set "Prismatic Evolutions"
 
 # Clear image cache
 poke-merkdo clear-cache
+
+# View store configuration
+poke-merkdo config
+
+# Update a setting
+poke-merkdo config store_name "My Pokemon Store"
+```
+
+## Store Configuration
+
+Customize your store's branding by editing `data/config.json`.
+
+### How It Works
+
+- On first run, an empty `data/config.json` is created automatically
+- If empty (`{}`), default values are used (Poke MerKdo branding)
+- Add only the fields you want to customize
+- Missing fields use defaults
+
+```json
+{
+  "store_name": "My Pokemon Store",
+  "catalog_title": "My Pokemon Store - Card Catalog",
+  "logo_path": "data/images/logo/my_logo.png",
+  "social_networks": [
+    {
+      "platform": "Instagram",
+      "handle": "@my_store",
+      "url": "https://www.instagram.com/my_store/"
+    },
+    {
+      "platform": "WhatsApp",
+      "handle": "+57 300 000 0000",
+      "url": "https://wa.me/573000000000?text=Hi%2C%20I%27m%20interested%20in%20a%20card"
+    }
+  ],
+  "welcome_message": "Welcome to our Pokémon TCG catalog.",
+  "contact_message": "Contact us for prices and availability."
+}
+```
+
+### Configuration Options
+
+| Key | Description | Example |
+|-----|-------------|---------|
+| `store_name` | Your store name | `"Pokemon Shop"` |
+| `catalog_title` | PDF catalog title | `"Pokemon Shop - Catalog"` |
+| `logo_path` | Path to logo image (relative to project) | `"data/images/logo/logo.png"` |
+| `social_networks` | List of social media accounts | See below |
+| `welcome_message` | Welcome text on PDF cover | `"Welcome to our catalog"` |
+| `contact_message` | Contact instructions | `"DM us for prices"` |
+
+### Social Networks
+
+Add multiple social networks to your catalog:
+
+```json
+"social_networks": [
+  {
+    "platform": "Instagram",
+    "handle": "@my_store",
+    "url": "https://www.instagram.com/my_store/"
+  },
+  {
+    "platform": "Facebook",
+    "handle": "My Pokemon Store",
+    "url": "https://www.facebook.com/mystore"
+  },
+  {
+    "platform": "WhatsApp",
+    "handle": "+57 300 000 0000",
+    "url": "https://wa.me/573000000000?text=Hello"
+  },
+  {
+    "platform": "TikTok",
+    "handle": "@my_store",
+    "url": "https://www.tiktok.com/@my_store"
+  }
+]
+```
+
+**Supported platforms with icons:**
+- Instagram 📸
+- Facebook 📘
+- WhatsApp 📱
+- Twitter/X 🐦
+- TikTok 🎵
+- YouTube 📺
+- Telegram ✈️
+- Others 🔗
+
+### WhatsApp Link Format
+
+For WhatsApp with a pre-filled message:
+
+```
+https://wa.me/PHONENUMBER?text=URL_ENCODED_MESSAGE
+```
+
+Example (Colombian number +57 300 000 0000):
+```
+https://wa.me/573000000000?text=Hola%2C%20me%20interesa%20una%20carta
+```
+
+**URL encode your message:** Replace spaces with `%20`, commas with `%2C`, etc.
+
+### CLI Commands
+
+```bash
+# View all settings
+poke-merkdo config
+
+# View specific setting
+poke-merkdo config store_name
+
+# Update setting (not for social_networks)
+poke-merkdo config store_name "New Name"
+poke-merkdo config welcome_message "Welcome!"
+
+# For social networks, edit data/config.json directly
 ```
 
 ## Project Structure
@@ -172,16 +293,21 @@ poke-merkdo clear-cache
 poke-merkdo/
 ├── poke_merkdo/
 │   ├── api/                 # TCGdex client
-│   │   └── tcgdex_enricher.py
 │   ├── cache/               # Image cache
 │   ├── cli/                 # CLI commands
+│   ├── config/              # Configuration module
+│   │   ├── paths.py         # Path constants
+│   │   ├── constants.py     # Fixed constants
+│   │   └── store.py         # Store configuration
 │   ├── generators/          # PDF generator
 │   ├── models/              # Data models
 │   └── parsers/             # CSV parser
 ├── catalogs/                # Generated PDFs
 ├── data/
 │   ├── cache/               # Cached images
-│   └── logs/                # Not-found card logs
+│   ├── logs/                # Not-found card logs
+│   ├── images/logo/         # Store logo
+│   └── config.json          # Your store config (auto-created, edit to customize)
 ├── collection.csv           # Your collection
 └── pyproject.toml
 ```
