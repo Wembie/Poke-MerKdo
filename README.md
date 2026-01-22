@@ -93,6 +93,7 @@ Usage: poke-merkdo generate [OPTIONS]
 
  By default only includes saleable cards (qty >= 2).
  Use --all to include ALL cards, or --min-qty for a custom minimum.
+ Cards are sorted by set and number by default.
 
 Options:
   -o, --output PATH          Output PDF path  [default: catalogs/catalog_DATE.pdf]
@@ -103,6 +104,7 @@ Options:
   -t, --title TEXT           Catalog title  [default: Poke MerKdo - Catálogo de Cartas]
   -a, --all / --saleable     Include ALL cards  [default: only qty >= 2]
   -m, --min-qty INTEGER      Minimum quantity to include  [default: 2]
+  -s, --sort TEXT            Sort by: set (collection + number), name, price  [default: set]
   --help                     Show this message and exit.
 ```
 
@@ -157,6 +159,15 @@ poke-merkdo generate --enrich --csv exports/my_collection.csv
 # Internal catalog with prices
 poke-merkdo generate --enrich --prices -o internal.pdf
 
+# Sort by set and card number (default)
+poke-merkdo generate --enrich --sort set
+
+# Sort by card name
+poke-merkdo generate --enrich --sort name
+
+# Sort by price (highest first)
+poke-merkdo generate --enrich --sort price
+
 # List all saleable cards
 poke-merkdo list-cards --saleable
 
@@ -171,6 +182,9 @@ poke-merkdo config
 
 # Update a setting
 poke-merkdo config store_name "My Pokemon Store"
+
+#My favorite command
+poke-merkdo generate --enrich --all
 ```
 
 ## Store Configuration
