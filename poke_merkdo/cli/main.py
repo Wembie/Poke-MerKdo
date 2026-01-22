@@ -25,7 +25,7 @@ from poke_merkdo.config import (
     update_config,
 )
 from poke_merkdo.generators import PDFGenerator
-from poke_merkdo.models import Card, Collection
+from poke_merkdo.models import Card, Collection, SaleableCard
 from poke_merkdo.parsers import CSVParser
 
 app = typer.Typer(
@@ -92,11 +92,19 @@ def generate(  # noqa: PLR0913
         help="Minimum quantity to include",
         show_default=True,
     ),
+    sort_by: str = typer.Option(
+        "set",
+        "--sort",
+        "-s",
+        help="Sort cards by: set (collection + number), name, price",
+        show_default=True,
+    ),
 ) -> None:
     """Generate a PDF catalog of cards.
 
     By default only includes saleable cards (qty >= 2).
     Use --all to include ALL cards, or --min-qty for a custom minimum.
+    Cards are sorted by set and number by default.
     """
     console.print(Panel.fit("Poke MerKdo - Catalog Generator", style="bold magenta"))
 
@@ -138,6 +146,8 @@ def generate(  # noqa: PLR0913
         if all_cards:
             min_quantity = 1
         saleable = collection.get_cards_by_min_quantity(min_quantity)
+
+        saleable = _sort_cards(saleable, sort_by)
 
         if not saleable:
             progress.stop()
@@ -503,6 +513,33 @@ def config(
         console.print(f"[green]OK[/green] Updated [cyan]{key}[/cyan]")
         console.print(f"  [dim]Old:[/dim] {old_value}")
         console.print(f"  [green]New:[/green] {value}")
+
+
+def _sort_cards(cards: list[SaleableCard], sort_by: str) -> list[SaleableCard]:
+    """Sort cards by specified criteria.
+
+    Args:
+        cards: List of saleable cards
+        sort_by: Sort method - 'set' (collection + number), 'name', 'price'
+
+    Returns:
+        Sorted list of cards
+    """
+    if sort_by == "name":
+        return sorted(cards, key=lambda sc: sc.card.card_name.lower())
+
+    if sort_by == "price":
+        return sorted(cards, key=lambda sc: sc.card.price_dollars, reverse=True)
+
+    def set_sort_key(sc: SaleableCard) -> tuple[str, int]:
+        card = sc.card
+        num = 0
+        if card.card_number:
+            digits = "".join(c for c in card.card_number if c.isdigit())
+            num = int(digits) if digits else 0
+        return (card.console_name.lower(), num)
+
+    return sorted(cards, key=set_sort_key)
 
 
 def _load_custom_prices(collection: Collection) -> None:
